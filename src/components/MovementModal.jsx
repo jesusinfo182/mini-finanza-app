@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { X } from 'lucide-react'
-import { CATS, fmt, formatAmountTyping, parseAmount } from '../lib/helpers'
+import { CATS, fmt, formatAmountTyping, parseAmount, todayLocalISODate } from '../lib/helpers'
 
 export default function MovementModal({ accounts, initial, onClose, onSave, onUpdate, onSaveInstallment, cardBg, border, text, subtext, accent, bg }) {
   const isEditing = !!initial
@@ -11,7 +11,7 @@ export default function MovementModal({ accounts, initial, onClose, onSave, onUp
   const [description, setDescription] = useState(initial?.description || '')
   const [notes, setNotes] = useState(initial?.notes || '')
   const [shared, setShared] = useState(initial?.shared || false)
-  const [date, setDate] = useState(initial?.date ? new Date(initial.date).toISOString().slice(0, 10) : new Date().toISOString().slice(0, 10))
+  const [date, setDate] = useState(initial?.date ? initial.date.slice(0, 10) : todayLocalISODate())
   const [hasInstallment, setHasInstallment] = useState(false)
   const [installmentCount, setInstallmentCount] = useState(2)
   const [error, setError] = useState('')
@@ -28,14 +28,14 @@ export default function MovementModal({ accounts, initial, onClose, onSave, onUp
       onSaveInstallment({
         name: description || 'Compra en cuotas', category, accountId,
         totalAmount: total, count: Number(installmentCount), cuotaAmount, notes, shared,
-        purchaseDate: new Date().toISOString(),
+        purchaseDate: todayLocalISODate(),
       })
       return
     }
     const finalAmount = parseAmount(amount)
     if (!finalAmount || finalAmount <= 0) { setError('Ingresá un monto válido, mayor a $0.'); return }
     if (!accountId) { setError('Seleccioná una cuenta.'); return }
-    const payload = { type, amount: finalAmount, category: type === 'expense' ? category : 'ingreso', accountId, description, notes, shared, date: new Date(date).toISOString() }
+    const payload = { type, amount: finalAmount, category: type === 'expense' ? category : 'ingreso', accountId, description, notes, shared, date }
     if (isEditing) onUpdate(initial.id, payload)
     else onSave(payload)
   }
