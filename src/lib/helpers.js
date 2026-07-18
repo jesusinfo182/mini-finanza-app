@@ -53,13 +53,13 @@ export function monthsBetween(d1, d2) {
 }
 
 export function cuotaForMonth(plan, monthDate) {
-  const diff = monthsBetween(new Date(plan.purchaseDate), monthDate)
+  const diff = monthsBetween(parseLocalDate(plan.purchaseDate), monthDate)
   if (diff < 0 || diff >= plan.count) return null
   return diff + 1
 }
 
 export function cuotaStatus(plan, cuotaIndex) {
-  const dueMonth = new Date(plan.purchaseDate)
+  const dueMonth = parseLocalDate(plan.purchaseDate)
   dueMonth.setMonth(dueMonth.getMonth() + (cuotaIndex - 1))
   const diff = monthsBetween(dueMonth, new Date())
   if (diff > 0) return 'paid'
@@ -69,4 +69,23 @@ export function cuotaStatus(plan, cuotaIndex) {
 
 export function monthKey(d) {
   return `${d.getFullYear()}-${d.getMonth() + 1}`
+}
+
+// Returns today's date as YYYY-MM-DD using the LOCAL calendar day (not UTC),
+// avoiding the classic bug where toISOString() rolls the date to the next day
+// for timezones behind UTC (e.g. Argentina, UTC-3) in the evening.
+export function todayLocalISODate() {
+  const d = new Date()
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
+}
+
+// Parses a "YYYY-MM-DD" string as a LOCAL date (not UTC midnight), so that
+// getMonth()/getFullYear()/getDate() reflect the intended calendar day
+// regardless of the user's timezone offset.
+export function parseLocalDate(dateStr) {
+  const [y, m, d] = String(dateStr).slice(0, 10).split('-').map(Number)
+  return new Date(y, m - 1, d)
 }
