@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
 import { ChevronDown, Check, Trash2, Pencil, Plus } from 'lucide-react'
-import { fmt, fitFontSize, monthLabel, cuotaStatus } from '../lib/helpers'
+import { fmt, fitFontSize, monthLabel, cuotaStatus, formatLocalDate } from '../lib/helpers'
 
 export function SummaryCard({ label, value, fontSize, color, cardBg, border, subtext }) {
   return (
@@ -100,6 +100,7 @@ export function CuotasSection({ title, emptyText, items, onToggle, onDelete, onA
                     <div style={{ fontWeight: 700, fontSize: 14, color: text }}>{item.name} {done && <span style={{ color: '#22c55e', fontSize: 12 }}>· Completado</span>}</div>
                     {renderMeta(item) && <div style={{ fontSize: 12, color: subtext }}>{renderMeta(item)}</div>}
                     <div style={{ fontSize: 12, color: subtext, marginTop: 2 }}>Total {fmt(item.total_amount)} · {paidCount}/{item.cuotas.length} cuotas</div>
+                    {item.created_at && <div style={{ fontSize: 11, color: subtext, marginTop: 2 }}>Creado el {formatLocalDate(item.created_at)}</div>}
                     {item.notes && <div style={{ fontSize: 12, color: subtext, fontStyle: 'italic', marginTop: 2 }}>"{item.notes}"</div>}
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -116,6 +117,7 @@ export function CuotasSection({ title, emptyText, items, onToggle, onDelete, onA
                           {c.paid && <Check size={11} color="#fff" strokeWidth={3} />}
                         </div>
                         <span style={{ fontSize: 13, color: c.paid ? subtext : text, textDecoration: c.paid ? 'line-through' : 'none' }}>Cuota {String(c.n).padStart(2, '0')}/{String(item.cuotas.length).padStart(2, '0')}</span>
+                        {c.paid && c.paid_date && <span style={{ fontSize: 11, color: subtext }}>· {formatLocalDate(c.paid_date)}</span>}
                       </div>
                       <span style={{ fontSize: 13, color: c.paid ? subtext : text }}>{fmt(item.cuota_amount)}</span>
                     </div>
@@ -165,6 +167,7 @@ export function InstallmentsOverview({ items, onDelete, onArchive, onEdit, rende
                     <div style={{ fontWeight: 700, fontSize: 14, color: text }}>{plan.name} {plan.shared && <span style={{ color: accent, fontSize: 12, fontWeight: 600 }}>· Compartido</span>}</div>
                     <div style={{ fontSize: 12, color: subtext }}>{renderMeta(plan)}</div>
                     <div style={{ fontSize: 12, color: subtext, marginTop: 2 }}>Total {fmt(plan.totalAmount)} · {paidCount}/{plan.count} cuotas</div>
+                    <div style={{ fontSize: 11, color: subtext, marginTop: 2 }}>Comprado el {formatLocalDate(plan.purchaseDate)}</div>
                     {plan.notes && <div style={{ fontSize: 12, color: subtext, fontStyle: 'italic', marginTop: 2 }}>"{plan.notes}"</div>}
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
