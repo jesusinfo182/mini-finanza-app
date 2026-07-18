@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo, useRef } from 'react'
 import { Plus, Moon, Sun, Settings as SettingsIcon, ChevronLeft, ChevronRight, Trash2, Pencil, Wallet } from 'lucide-react'
 import { supabase } from './lib/supabaseClient'
 import * as api from './lib/api'
-import { CATS, fmt, fitFontSize, monthLabel, barColor, cuotaForMonth, monthKey } from './lib/helpers'
+import { CATS, fmt, fitFontSize, monthLabel, barColor, cuotaForMonth, monthKey, parseLocalDate, todayLocalISODate } from './lib/helpers'
 import { SummaryCard, ConfirmDialog, ObligationsSection, CuotasSection, InstallmentsOverview, ArchivedSection } from './components/Sections'
 import MovementModal from './components/MovementModal'
 import LoanModal from './components/LoanModal'
@@ -68,7 +68,7 @@ export default function App() {
 
   const monthMovements = useMemo(() => {
     return movements.filter(m => {
-      const d = new Date(m.date)
+      const d = parseLocalDate(m.date)
       return d.getMonth() === monthCursor.getMonth() && d.getFullYear() === monthCursor.getFullYear()
     }).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0))
   }, [movements, monthCursor])
@@ -106,7 +106,7 @@ export default function App() {
     movements.forEach(m => { if (bal[m.accountId] !== undefined) bal[m.accountId] += m.type === 'income' ? Number(m.amount) : -Number(m.amount) })
     const now = new Date()
     installments.forEach(plan => {
-      const diff = (now.getFullYear() - new Date(plan.purchaseDate).getFullYear()) * 12 + (now.getMonth() - new Date(plan.purchaseDate).getMonth())
+      const diff = (now.getFullYear() - parseLocalDate(plan.purchaseDate).getFullYear()) * 12 + (now.getMonth() - parseLocalDate(plan.purchaseDate).getMonth())
       const elapsed = Math.min(plan.count, Math.max(0, diff + 1))
       if (bal[plan.accountId] !== undefined) bal[plan.accountId] -= Number(plan.cuotaAmount) * elapsed
     })
@@ -225,7 +225,7 @@ export default function App() {
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    a.download = `fin-mini-backup-${new Date().toISOString().slice(0, 10)}.json`
+    a.download = `fin-mini-backup-${todayLocalISODate()}.json`
     a.click()
     URL.revokeObjectURL(url)
     const now = new Date().toISOString()
@@ -282,7 +282,7 @@ export default function App() {
       <h2>${c.label} (${rules[c.id]}%) — ${fmt(catTotals[c.id])}</h2>
       <table><tr><th>Fecha</th><th>Descripción</th><th>Cuenta</th><th>Monto</th><th>Notas</th></tr>
       ${rows(c.id).map(m => `<tr>
-        <td>${m.isInstallment ? monthLabel(monthCursor) : new Date(m.date).toLocaleDateString('es-AR')}</td>
+        <td>${m.isInstallment ? monthLabel(monthCursor) : parseLocalDate(m.date).toLocaleDateString('es-AR')}</td>
         <td>${m.description || '—'}${m.shared ? '<span class="badge">Compartido</span>' : ''}${m.isInstallment ? `<span class="badge">Cuota ${m.cuotaIndex}/${m.plan.count} · Total ${fmt(m.plan.totalAmount)}</span>` : ''}</td>
         <td>${accName(m.accountId)}</td>
         <td>${fmt(m.amount)}</td>
