@@ -89,3 +89,12 @@ export function parseLocalDate(dateStr) {
   const [y, m, d] = String(dateStr).slice(0, 10).split('-').map(Number)
   return new Date(y, m - 1, d)
 }
+
+export function truncateNotes(notes, max = 90) {
+  if (!notes) return ''
+  return notes.length > max ? notes.slice(0, max).trim() + '...' : notes
+}
+
+export function formatLocalDate(dateStr) {
+  return parseLocalDate(dateStr).toLocaleDateString('es-AR')
+}
