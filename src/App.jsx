@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo, useRef } from 'react'
 import { Plus, Moon, Sun, Settings as SettingsIcon, ChevronLeft, ChevronRight, Trash2, Pencil, Wallet } from 'lucide-react'
 import { supabase } from './lib/supabaseClient'
 import * as api from './lib/api'
-import { CATS, fmt, fitFontSize, monthLabel, barColor, cuotaForMonth, monthKey, parseLocalDate, todayLocalISODate } from './lib/helpers'
+import { CATS, fmt, fitFontSize, monthLabel, barColor, cuotaForMonth, monthKey, parseLocalDate, todayLocalISODate, truncateNotes, formatLocalDate } from './lib/helpers'
 import { SummaryCard, ConfirmDialog, ObligationsSection, CuotasSection, InstallmentsOverview, ArchivedSection } from './components/Sections'
 import MovementModal from './components/MovementModal'
 import LoanModal from './components/LoanModal'
@@ -78,7 +78,7 @@ export default function App() {
     installments.forEach(plan => {
       const n = cuotaForMonth(plan, monthCursor)
       if (n !== null) {
-        out.push({ id: `${plan.id}-cuota-${n}`, isInstallment: true, plan, cuotaIndex: n, amount: plan.cuotaAmount, category: plan.category, accountId: plan.accountId, description: plan.name, notes: plan.notes, shared: plan.shared, createdAt: plan.createdAt })
+        out.push({ id: `${plan.id}-cuota-${n}`, isInstallment: true, plan, cuotaIndex: n, amount: plan.cuotaAmount, category: plan.category, accountId: plan.accountId, description: plan.name, notes: plan.notes, shared: plan.shared, createdAt: plan.createdAt, date: plan.purchaseDate })
       }
     })
     return out.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0))
@@ -257,39 +257,63 @@ export default function App() {
   function downloadReport() {
     const accName = (id) => accounts.find(a => a.id === id)?.name || '—'
     const rows = (catId) => [...monthMovements.filter(m => m.type === 'expense'), ...monthInstallmentEntries].filter(m => m.category === catId)
+    const accentHex = '#7c5cff'
     const html = `<!doctype html><html><head><meta charset="utf-8"><title>Resumen ${monthLabel(monthCursor)}</title>
     <style>
-      body{font-family:Arial,sans-serif;padding:32px;color:#1a1a1a;}
-      h1{margin-bottom:0;} .sub{color:#666;margin-top:4px;}
-      .summary{display:flex;gap:16px;margin:24px 0;}
-      .card{border:1px solid #ddd;border-radius:8px;padding:12px 16px;flex:1;}
-      .card b{display:block;font-size:20px;margin-top:4px;}
-      h2{border-bottom:2px solid #333;padding-bottom:4px;margin-top:32px;}
-      table{width:100%;border-collapse:collapse;margin-top:8px;}
-      td,th{text-align:left;padding:6px 4px;border-bottom:1px solid #eee;font-size:13px;}
-      .badge{font-size:11px;background:#eee;border-radius:4px;padding:1px 6px;margin-left:4px;}
-      @media print{ button{display:none;} }
+      * { box-sizing: border-box; }
+      body{font-family:'Segoe UI',Arial,sans-serif;padding:40px;color:#1a1a1a;max-width:820px;margin:0 auto;}
+      .brand{font-size:15px;font-weight:800;color:${accentHex};letter-spacing:.5px;}
+      .brand span{color:#1a1a1a;font-weight:400;}
+      h1{margin:6px 0 0;font-size:26px;}
+      .sub{color:#777;margin-top:2px;font-size:14px;}
+      .summary{display:flex;gap:14px;margin:26px 0;}
+      .card{border:1px solid #e5e5ea;border-radius:10px;padding:14px 16px;flex:1;background:#fafafa;}
+      .card .lbl{font-size:11px;letter-spacing:.5px;color:#888;font-weight:700;text-transform:uppercase;}
+      .card b{display:block;font-size:19px;margin-top:6px;}
+      .cat-header{display:flex;justify-content:space-between;align-items:baseline;border-bottom:2px solid #1a1a1a;padding-bottom:6px;margin-top:34px;}
+      .cat-header h2{margin:0;font-size:17px;}
+      .cat-header .amt{font-size:15px;font-weight:700;}
+      .overspend{display:inline-block;margin-top:6px;font-size:12px;font-weight:700;color:#b91c1c;background:#fef2f2;border:1px solid #fecaca;border-radius:6px;padding:3px 9px;}
+      .onbudget{display:inline-block;margin-top:6px;font-size:12px;font-weight:600;color:#15803d;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:6px;padding:3px 9px;}
+      table{width:100%;border-collapse:collapse;margin-top:10px;}
+      td,th{text-align:left;padding:7px 4px;border-bottom:1px solid #eee;font-size:12.5px;}
+      th{color:#888;font-weight:600;text-transform:uppercase;font-size:10.5px;letter-spacing:.3px;}
+      .badge{font-size:10.5px;background:#f1eeff;color:${accentHex};border-radius:4px;padding:1px 7px;margin-left:5px;font-weight:600;}
+      .notes{color:#888;font-style:italic;}
+      .printbtn{padding:9px 18px;margin-bottom:22px;border:none;border-radius:8px;background:${accentHex};color:#fff;font-weight:700;cursor:pointer;}
+      @media print{ .printbtn{display:none;} body{padding:16px;} }
     </style></head><body>
-    <button onclick="window.print()" style="padding:8px 16px;margin-bottom:16px;">Imprimir / Guardar como PDF</button>
-    <h1>fin. mini — Resumen</h1>
+    <button class="printbtn" onclick="window.print()">Imprimir / Guardar como PDF</button>
+    <div class="brand">fin<span>. mini</span></div>
+    <h1>Resumen mensual</h1>
     <div class="sub">${monthLabel(monthCursor)}</div>
     <div class="summary">
-      <div class="card">Ingresos<b>${fmt(ingresos)}</b></div>
-      <div class="card">Gastado<b>${fmt(gastado)}</b></div>
-      <div class="card">Disponible<b>${fmt(disponible)}</b></div>
+      <div class="card"><div class="lbl">Ingresos</div><b>${fmt(ingresos)}</b></div>
+      <div class="card"><div class="lbl">Gastado</div><b style="color:#dc2626">${fmt(gastado)}</b></div>
+      <div class="card"><div class="lbl">Disponible</div><b style="color:#16a34a">${fmt(disponible)}</b></div>
     </div>
-    ${CATS.map(c => `
-      <h2>${c.label} (${rules[c.id]}%) — ${fmt(catTotals[c.id])}</h2>
+    ${CATS.map(c => {
+      const limit = ingresos * (rules[c.id] / 100)
+      const spent = catTotals[c.id]
+      const over = limit > 0 && spent > limit
+      return `
+      <div class="cat-header">
+        <h2>${c.label} <span style="color:#999;font-weight:400;font-size:13px;">(${rules[c.id]}%)</span></h2>
+        <span class="amt">${fmt(spent)} <span style="color:#999;font-weight:400;">/ ${fmt(limit)}</span></span>
+      </div>
+      ${limit > 0 ? (over
+        ? `<div class="overspend">Te excediste por ${fmt(spent - limit)}</div>`
+        : `<div class="onbudget">Dentro del límite</div>`) : ''}
       <table><tr><th>Fecha</th><th>Descripción</th><th>Cuenta</th><th>Monto</th><th>Notas</th></tr>
       ${rows(c.id).map(m => `<tr>
-        <td>${m.isInstallment ? monthLabel(monthCursor) : parseLocalDate(m.date).toLocaleDateString('es-AR')}</td>
+        <td>${parseLocalDate(m.date).toLocaleDateString('es-AR')}</td>
         <td>${m.description || '—'}${m.shared ? '<span class="badge">Compartido</span>' : ''}${m.isInstallment ? `<span class="badge">Cuota ${m.cuotaIndex}/${m.plan.count} · Total ${fmt(m.plan.totalAmount)}</span>` : ''}</td>
         <td>${accName(m.accountId)}</td>
         <td>${fmt(m.amount)}</td>
-        <td>${m.notes || ''}</td>
+        <td class="notes">${m.notes || ''}</td>
       </tr>`).join('') || `<tr><td colspan="5" style="color:#999">Sin movimientos</td></tr>`}
       </table>
-    `).join('')}
+    `}).join('')}
     </body></html>`
     const blob = new Blob([html], { type: 'text/html' })
     const url = URL.createObjectURL(blob)
@@ -438,24 +462,30 @@ export default function App() {
         <div style={{ fontSize: 12, letterSpacing: 1, color: subtext, fontWeight: 700, marginBottom: 10, paddingLeft: 2 }}>MOVIMIENTOS DEL MES</div>
         {combinedMonthList.length === 0 && <div style={{ color: subtext, fontSize: 14, padding: '20px 0', textAlign: 'center' }}>Sin movimientos todavía. Usá el botón + para agregar uno.</div>}
         {combinedMonthList.map(m => (
-          <div key={m.id} onClick={() => openEditMovement(m)} style={{ background: cardBg, border: `1px solid ${m.isInstallment ? accent + '55' : border}`, borderRadius: 12, padding: 14, marginBottom: 8, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', cursor: m.isInstallment ? 'default' : 'pointer' }}>
-            <div>
+          <div key={m.id} onClick={() => openEditMovement(m)} style={{ background: cardBg, border: `1px solid ${m.isInstallment ? accent + '55' : border}`, borderRadius: 12, padding: 14, marginBottom: 8, cursor: m.isInstallment ? 'default' : 'pointer' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
               <div style={{ fontWeight: 600, fontSize: 14 }}>{m.description || '(Sin descripción)'}</div>
-              <div style={{ fontSize: 12, color: subtext, marginTop: 2 }}>
-                {CATS.find(c => c.id === m.category)?.label || 'Ingreso'} · <span style={{ color: '#f472b6', fontWeight: 600 }}>{accounts.find(a => a.id === m.accountId)?.name || '—'}</span>
-                {m.shared && <span style={{ marginLeft: 6, color: accent }}>· Compartido</span>}
-                {m.isInstallment && <span style={{ marginLeft: 6 }}>· Cuota {m.cuotaIndex}/{m.plan.count} (Total {fmt(m.plan.totalAmount)})</span>}
-              </div>
-              {m.notes && <div style={{ fontSize: 12, color: subtext, marginTop: 4, fontStyle: 'italic' }}>"{m.notes}"</div>}
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <span style={{ fontWeight: 700, whiteSpace: 'nowrap', color: m.type === 'income' ? '#22c55e' : '#ef4444' }}>{m.type === 'income' ? '+' : '-'}{fmt(m.amount)}</span>
               {!m.isInstallment && (
-                <>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0, marginLeft: 8 }}>
                   <button onClick={(e) => { e.stopPropagation(); openEditMovement(m) }} style={{ background: 'none', border: 'none', color: subtext, cursor: 'pointer' }}><Pencil size={14} /></button>
                   <button onClick={(e) => { e.stopPropagation(); deleteMovement(m.id) }} style={{ background: 'none', border: 'none', color: subtext, cursor: 'pointer' }}><Trash2 size={15} /></button>
-                </>
+                </div>
               )}
+            </div>
+            <div style={{ fontSize: 12, color: subtext, marginTop: 2 }}>
+              <b style={{ color: subtext }}>{CATS.find(c => c.id === m.category)?.label || 'Ingreso'}</b> · <span style={{ color: '#f472b6', fontWeight: 600 }}>{accounts.find(a => a.id === m.accountId)?.name || '—'}</span>
+            </div>
+            {(m.shared || m.isInstallment) && (
+              <div style={{ fontSize: 12, color: accent, marginTop: 2 }}>
+                {m.isInstallment && `Cuota ${m.cuotaIndex}/${m.plan.count} (Total ${fmt(m.plan.totalAmount)})`}
+                {m.isInstallment && m.shared && ' · '}
+                {m.shared && 'Compartido'}
+              </div>
+            )}
+            {m.notes && <div style={{ fontSize: 12, color: subtext, marginTop: 4, fontStyle: 'italic' }}>"{truncateNotes(m.notes)}"</div>}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginTop: 8 }}>
+              <span style={{ fontSize: 12, color: subtext }}>{formatLocalDate(m.date)}</span>
+              <span style={{ fontWeight: 700, whiteSpace: 'nowrap', color: m.type === 'income' ? '#22c55e' : '#ef4444' }}>{m.type === 'income' ? '+' : '-'}{fmt(m.amount)}</span>
             </div>
           </div>
         ))}
