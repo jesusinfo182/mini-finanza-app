@@ -1,12 +1,73 @@
 import { useState, useRef, useEffect } from 'react'
 import { ChevronDown, Check, Trash2, Pencil, Plus } from 'lucide-react'
-import { fmt, fitFontSize, monthLabel, cuotaStatus, formatLocalDate } from '../lib/helpers'
+import { CATS, fmt, fitFontSize, monthLabel, cuotaStatus, formatLocalDate, truncateNotes } from '../lib/helpers'
+
+function SectionChevron({ open, subtext }) {
+  return (
+    <div style={{ width: 26, height: 26, display: 'flex', alignItems: 'center', justifyContent: 'center', color: subtext, flexShrink: 0 }}>
+      <ChevronDown size={18} strokeWidth={2.25} style={{ transform: open ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform .2s' }} />
+    </div>
+  )
+}
 
 export function SummaryCard({ label, value, fontSize, color, cardBg, border, subtext }) {
   return (
     <div style={{ flex: 1, minWidth: 0, background: cardBg, border: `1px solid ${border}`, borderRadius: 12, padding: '14px 8px', textAlign: 'center' }}>
       <div style={{ fontSize: 10, letterSpacing: 1, color: subtext, fontWeight: 700 }}>{label.toUpperCase()}</div>
       <div style={{ fontSize, fontWeight: 800, color, marginTop: 6, whiteSpace: 'nowrap', overflow: 'hidden' }}>{value}</div>
+    </div>
+  )
+}
+
+export function MovementCard({ m, accounts, onEdit, onDelete, cardBg, border, text, subtext, accent }) {
+  return (
+    <div onClick={() => onEdit(m)} style={{ background: cardBg, border: `1px solid ${m.isInstallment ? accent + '55' : border}`, borderRadius: 12, padding: 14, marginBottom: 8, cursor: m.isInstallment ? 'default' : 'pointer' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+        <div style={{ fontWeight: 600, fontSize: 14 }}>{m.description || '(Sin descripción)'}</div>
+        {!m.isInstallment && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0, marginLeft: 8 }}>
+            <button onClick={(e) => { e.stopPropagation(); onEdit(m) }} style={{ background: 'none', border: 'none', color: subtext, cursor: 'pointer' }}><Pencil size={14} /></button>
+            <button onClick={(e) => { e.stopPropagation(); onDelete(m.id) }} style={{ background: 'none', border: 'none', color: subtext, cursor: 'pointer' }}><Trash2 size={15} /></button>
+          </div>
+        )}
+      </div>
+      <div style={{ fontSize: 12, color: subtext, marginTop: 2 }}>
+        <b style={{ color: subtext }}>{CATS.find(c => c.id === m.category)?.label || 'Ingreso'}</b> · <span style={{ color: '#f472b6', fontWeight: 600 }}>{accounts.find(a => a.id === m.accountId)?.name || '—'}</span>
+      </div>
+      {(m.shared || m.isInstallment) && (
+        <div style={{ fontSize: 12, color: accent, marginTop: 2 }}>
+          {m.isInstallment && `Cuota ${m.cuotaIndex}/${m.plan.count} (Total ${fmt(m.plan.totalAmount)})`}
+          {m.isInstallment && m.shared && ' · '}
+          {m.shared && 'Compartido'}
+        </div>
+      )}
+      {m.notes && <div style={{ fontSize: 12, color: subtext, marginTop: 4, fontStyle: 'italic' }}>"{truncateNotes(m.notes)}"</div>}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginTop: 8 }}>
+        <span style={{ fontSize: 12, color: subtext }}>{formatLocalDate(m.date)}</span>
+        <span style={{ fontWeight: 700, whiteSpace: 'nowrap', color: m.type === 'income' ? '#22c55e' : '#ef4444' }}>{m.type === 'income' ? '+' : '-'}{fmt(m.amount)}</span>
+      </div>
+    </div>
+  )
+}
+
+export function AllMovementsView({ movements, accounts, monthLabelText, onBack, onEdit, onDelete, cardBg, border, text, subtext, accent, bg }) {
+  return (
+    <div style={{ position: 'fixed', inset: 0, background: bg, zIndex: 60, overflowY: 'auto' }}>
+      <div style={{ position: 'sticky', top: 0, background: bg, display: 'flex', alignItems: 'center', gap: 12, padding: '18px 20px', borderBottom: `1px solid ${border}` }}>
+        <button onClick={onBack} style={{ width: 34, height: 34, borderRadius: 10, background: cardBg, border: `1px solid ${border}`, color: text, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
+          <ChevronDown size={18} strokeWidth={2.25} style={{ transform: 'rotate(90deg)' }} />
+        </button>
+        <div>
+          <div style={{ fontWeight: 700, fontSize: 16, color: text }}>Todos los movimientos</div>
+          <div style={{ fontSize: 12, color: subtext }}>{monthLabelText}</div>
+        </div>
+      </div>
+      <div style={{ padding: '16px 20px' }}>
+        {movements.length === 0 && <div style={{ color: subtext, fontSize: 14, padding: '20px 0', textAlign: 'center' }}>Sin movimientos todavía.</div>}
+        {movements.map(m => (
+          <MovementCard key={m.id} m={m} accounts={accounts} onEdit={onEdit} onDelete={onDelete} cardBg={cardBg} border={border} text={text} subtext={subtext} accent={accent} />
+        ))}
+      </div>
     </div>
   )
 }
@@ -37,9 +98,7 @@ export function ObligationsSection({ obligations, checks, onToggle, cardBg, bord
           <div style={{ fontSize: 12, letterSpacing: 1, color: subtext, fontWeight: 700 }}>OBLIGACIONES MENSUALES</div>
           <div style={{ fontSize: 11, color: subtext }}>({paidCount}/{obligations.length})</div>
         </div>
-        <div style={{ width: 26, height: 26, display: 'flex', alignItems: 'center', justifyContent: 'center', color: subtext }}>
-          <ChevronDown size={18} style={{ transform: open ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform .2s' }} />
-        </div>
+        <SectionChevron open={open} subtext={subtext} />
       </button>
       {open && (
         <div style={{ marginTop: 12 }}>
@@ -82,8 +141,8 @@ export function CuotasSection({ title, emptyText, items, onToggle, onDelete, onA
           {!hideAdd && (
             <button onClick={onAdd} style={{ width: 26, height: 26, borderRadius: 7, background: accent, border: 'none', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}><Plus size={15} /></button>
           )}
-          <button onClick={() => setOpen(o => !o)} style={{ width: 26, height: 26, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'none', border: 'none', color: subtext, cursor: 'pointer' }}>
-            <ChevronDown size={18} style={{ transform: open ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform .2s' }} />
+          <button onClick={() => setOpen(o => !o)} style={{ width: 26, height: 26, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'none', border: 'none', color: subtext, cursor: 'pointer', flexShrink: 0 }}>
+            <ChevronDown size={18} strokeWidth={2.25} style={{ transform: open ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform .2s' }} />
           </button>
         </div>
       </div>
@@ -101,7 +160,7 @@ export function CuotasSection({ title, emptyText, items, onToggle, onDelete, onA
                     {renderMeta(item) && <div style={{ fontSize: 12, color: subtext }}>{renderMeta(item)}</div>}
                     <div style={{ fontSize: 12, color: subtext, marginTop: 2 }}>Total {fmt(item.total_amount)} · {paidCount}/{item.cuotas.length} cuotas</div>
                     {item.created_at && <div style={{ fontSize: 11, color: subtext, marginTop: 2 }}>Creado el {formatLocalDate(item.created_at)}</div>}
-                    {item.notes && <div style={{ fontSize: 12, color: subtext, fontStyle: 'italic', marginTop: 2 }}>"{item.notes}"</div>}
+                    {item.notes && <div style={{ fontSize: 12, color: subtext, fontStyle: 'italic', marginTop: 2 }}>"{truncateNotes(item.notes)}"</div>}
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                     {done && <button onClick={() => onArchive(item.id)} title="Archivar" style={{ fontSize: 11, fontWeight: 700, color: accent, background: 'none', border: `1px solid ${accent}`, borderRadius: 6, padding: '3px 8px', cursor: 'pointer' }}>Archivar</button>}
@@ -150,9 +209,7 @@ export function InstallmentsOverview({ items, onDelete, onArchive, onEdit, rende
           <div style={{ fontSize: 12, letterSpacing: 1, color: subtext, fontWeight: 700 }}>COMPRAS EN CUOTAS</div>
           {items.length > 0 && <div style={{ fontSize: 11, color: subtext }}>({items.length})</div>}
         </div>
-        <div style={{ width: 26, height: 26, display: 'flex', alignItems: 'center', justifyContent: 'center', color: subtext }}>
-          <ChevronDown size={18} style={{ transform: open ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform .2s' }} />
-        </div>
+        <SectionChevron open={open} subtext={subtext} />
       </button>
       {open && (
         <div style={{ marginTop: 12 }}>
@@ -168,7 +225,7 @@ export function InstallmentsOverview({ items, onDelete, onArchive, onEdit, rende
                     <div style={{ fontSize: 12, color: subtext }}>{renderMeta(plan)}</div>
                     <div style={{ fontSize: 12, color: subtext, marginTop: 2 }}>Total {fmt(plan.totalAmount)} · {paidCount}/{plan.count} cuotas</div>
                     <div style={{ fontSize: 11, color: subtext, marginTop: 2 }}>Comprado el {formatLocalDate(plan.purchaseDate)}</div>
-                    {plan.notes && <div style={{ fontSize: 12, color: subtext, fontStyle: 'italic', marginTop: 2 }}>"{plan.notes}"</div>}
+                    {plan.notes && <div style={{ fontSize: 12, color: subtext, fontStyle: 'italic', marginTop: 2 }}>"{truncateNotes(plan.notes)}"</div>}
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                     {paidCount === plan.count && <button onClick={() => onArchive(plan.id)} title="Archivar" style={{ fontSize: 11, fontWeight: 700, color: accent, background: 'none', border: `1px solid ${accent}`, borderRadius: 6, padding: '3px 8px', cursor: 'pointer' }}>Archivar</button>}
@@ -212,9 +269,7 @@ export function ArchivedSection({ installments, loans, onUnarchiveInstallment, o
           <div style={{ fontSize: 12, letterSpacing: 1, color: subtext, fontWeight: 700 }}>ARCHIVADOS</div>
           <div style={{ fontSize: 11, color: subtext }}>({total})</div>
         </div>
-        <div style={{ width: 26, height: 26, display: 'flex', alignItems: 'center', justifyContent: 'center', color: subtext }}>
-          <ChevronDown size={18} style={{ transform: open ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform .2s' }} />
-        </div>
+        <SectionChevron open={open} subtext={subtext} />
       </button>
       {open && (
         <div style={{ marginTop: 12 }}>
