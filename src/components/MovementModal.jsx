@@ -105,7 +105,7 @@ export default function MovementModal({ accounts, initial, onClose, onSave, onUp
 
         <div style={{ marginBottom: 12 }}>
           <label style={labelStyle}>Notas</label>
-          <textarea style={{ ...inputStyle, minHeight: 60, resize: 'vertical' }} value={notes} onChange={e => setNotes(e.target.value)} placeholder="Notas adicionales..." />
+          <textarea style={{ ...inputStyle, minHeight: 60, resize: 'none' }} value={notes} onChange={e => setNotes(e.target.value)} placeholder="Notas adicionales..." />
         </div>
 
         {!hasInstallment && (
