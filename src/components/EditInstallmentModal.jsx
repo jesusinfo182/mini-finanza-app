@@ -76,7 +76,7 @@ export default function EditInstallmentModal({ plan, accounts, onClose, onSave, 
 
         <div style={{ marginBottom: 12 }}>
           <label style={labelStyle}>Notas</label>
-          <textarea style={{ ...inputStyle, minHeight: 60, resize: 'vertical' }} value={notes} onChange={e => setNotes(e.target.value)} />
+          <textarea style={{ ...inputStyle, minHeight: 60, resize: 'none' }} value={notes} onChange={e => setNotes(e.target.value)} />
         </div>
 
         <div style={{ marginBottom: 16 }}>
