@@ -3,7 +3,7 @@ import { Plus, Moon, Sun, Settings as SettingsIcon, ChevronLeft, ChevronRight, T
 import { supabase } from './lib/supabaseClient'
 import * as api from './lib/api'
 import { CATS, fmt, fitFontSize, monthLabel, barColor, cuotaForMonth, monthKey, parseLocalDate, todayLocalISODate, truncateNotes, formatLocalDate } from './lib/helpers'
-import { SummaryCard, ConfirmDialog, ObligationsSection, CuotasSection, InstallmentsOverview, ArchivedSection } from './components/Sections'
+import { SummaryCard, ConfirmDialog, ObligationsSection, CuotasSection, InstallmentsOverview, ArchivedSection, MovementCard, AllMovementsView } from './components/Sections'
 import MovementModal from './components/MovementModal'
 import LoanModal from './components/LoanModal'
 import EditInstallmentModal from './components/EditInstallmentModal'
@@ -30,6 +30,7 @@ export default function App() {
   const [editingLoan, setEditingLoan] = useState(null)
   const [editingInstallment, setEditingInstallment] = useState(null)
   const [confirmDialog, setConfirmDialog] = useState(null)
+  const [showAllMovements, setShowAllMovements] = useState(false)
   const fileInputRef = useRef(null)
 
   function requestConfirm(message, onConfirm) {
@@ -336,7 +337,7 @@ export default function App() {
   const iconBtn = { width: 36, height: 36, borderRadius: 10, background: cardBg, border: `1px solid ${border}`, color: text, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }
 
   return (
-    <div style={{ minHeight: '100vh', background: bg, color: text, fontFamily: "'Segoe UI', system-ui, sans-serif", paddingBottom: 100 }}>
+    <div style={{ minHeight: '100vh', background: bg, color: text, fontFamily: "'Poppins', system-ui, sans-serif", paddingBottom: 100 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '20px 20px 8px' }}>
         <div style={{ fontSize: 24, fontWeight: 800 }}>
           <span style={{ color: accent }}>fin.</span> <span style={{ fontWeight: 400, fontSize: 14, color: subtext }}>mini</span>
@@ -419,7 +420,7 @@ export default function App() {
         onEdit={(plan) => setEditingInstallment(plan)}
         cardBg={cardBg} border={border} text={text} subtext={subtext} accent={accent}
         renderMeta={(plan) => (
-          <><span style={{ color: '#f472b6', fontWeight: 600 }}>{accounts.find(a => a.id === plan.accountId)?.name || '—'}</span> · {CATS.find(c => c.id === plan.category)?.label || ''}</>
+          <><b>{CATS.find(c => c.id === plan.category)?.label || ''}</b> · <span style={{ color: '#f472b6', fontWeight: 600 }}>{accounts.find(a => a.id === plan.accountId)?.name || '—'}</span></>
         )}
       />
 
@@ -461,35 +462,27 @@ export default function App() {
       <div style={{ margin: '16px 20px 0' }}>
         <div style={{ fontSize: 12, letterSpacing: 1, color: subtext, fontWeight: 700, marginBottom: 10, paddingLeft: 2 }}>MOVIMIENTOS DEL MES</div>
         {combinedMonthList.length === 0 && <div style={{ color: subtext, fontSize: 14, padding: '20px 0', textAlign: 'center' }}>Sin movimientos todavía. Usá el botón + para agregar uno.</div>}
-        {combinedMonthList.map(m => (
-          <div key={m.id} onClick={() => openEditMovement(m)} style={{ background: cardBg, border: `1px solid ${m.isInstallment ? accent + '55' : border}`, borderRadius: 12, padding: 14, marginBottom: 8, cursor: m.isInstallment ? 'default' : 'pointer' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-              <div style={{ fontWeight: 600, fontSize: 14 }}>{m.description || '(Sin descripción)'}</div>
-              {!m.isInstallment && (
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0, marginLeft: 8 }}>
-                  <button onClick={(e) => { e.stopPropagation(); openEditMovement(m) }} style={{ background: 'none', border: 'none', color: subtext, cursor: 'pointer' }}><Pencil size={14} /></button>
-                  <button onClick={(e) => { e.stopPropagation(); deleteMovement(m.id) }} style={{ background: 'none', border: 'none', color: subtext, cursor: 'pointer' }}><Trash2 size={15} /></button>
-                </div>
-              )}
-            </div>
-            <div style={{ fontSize: 12, color: subtext, marginTop: 2 }}>
-              <b style={{ color: subtext }}>{CATS.find(c => c.id === m.category)?.label || 'Ingreso'}</b> · <span style={{ color: '#f472b6', fontWeight: 600 }}>{accounts.find(a => a.id === m.accountId)?.name || '—'}</span>
-            </div>
-            {(m.shared || m.isInstallment) && (
-              <div style={{ fontSize: 12, color: accent, marginTop: 2 }}>
-                {m.isInstallment && `Cuota ${m.cuotaIndex}/${m.plan.count} (Total ${fmt(m.plan.totalAmount)})`}
-                {m.isInstallment && m.shared && ' · '}
-                {m.shared && 'Compartido'}
-              </div>
-            )}
-            {m.notes && <div style={{ fontSize: 12, color: subtext, marginTop: 4, fontStyle: 'italic' }}>"{truncateNotes(m.notes)}"</div>}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginTop: 8 }}>
-              <span style={{ fontSize: 12, color: subtext }}>{formatLocalDate(m.date)}</span>
-              <span style={{ fontWeight: 700, whiteSpace: 'nowrap', color: m.type === 'income' ? '#22c55e' : '#ef4444' }}>{m.type === 'income' ? '+' : '-'}{fmt(m.amount)}</span>
-            </div>
-          </div>
+        {combinedMonthList.slice(0, 6).map(m => (
+          <MovementCard key={m.id} m={m} accounts={accounts} onEdit={openEditMovement} onDelete={deleteMovement} cardBg={cardBg} border={border} text={text} subtext={subtext} accent={accent} />
         ))}
+        {combinedMonthList.length > 6 && (
+          <button onClick={() => setShowAllMovements(true)} style={{ background: 'none', border: 'none', color: accent, fontWeight: 700, fontSize: 13, cursor: 'pointer', padding: '6px 2px', display: 'flex', alignItems: 'center', gap: 4 }}>
+            Consultar todas <span style={{ fontSize: 15 }}>→</span>
+          </button>
+        )}
       </div>
+
+      {showAllMovements && (
+        <AllMovementsView
+          movements={combinedMonthList}
+          accounts={accounts}
+          monthLabelText={monthLabel(monthCursor)}
+          onBack={() => setShowAllMovements(false)}
+          onEdit={openEditMovement}
+          onDelete={deleteMovement}
+          cardBg={cardBg} border={border} text={text} subtext={subtext} accent={accent} bg={bg}
+        />
+      )}
 
       <button onClick={() => { setEditingMovement(null); setShowModal(true) }} style={{ position: 'fixed', bottom: 24, right: 24, width: 58, height: 58, borderRadius: '50%', background: accent, border: 'none', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 6px 20px rgba(124,92,255,.5)', cursor: 'pointer' }}>
         <Plus size={28} />
