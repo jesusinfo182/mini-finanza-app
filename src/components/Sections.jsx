@@ -20,10 +20,11 @@ export function SummaryCard({ label, value, fontSize, color, cardBg, border, sub
 }
 
 export function MovementCard({ m, accounts, onEdit, onDelete, cardBg, border, text, subtext, accent }) {
+  const leftColStyle = { paddingRight: 70 }
   return (
     <div onClick={() => onEdit(m)} style={{ background: cardBg, border: `1px solid ${m.isInstallment ? accent + '55' : border}`, borderRadius: 12, padding: 14, marginBottom: 8, cursor: m.isInstallment ? 'default' : 'pointer' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-        <div style={{ fontWeight: 600, fontSize: 14 }}>{m.description || '(Sin descripción)'}</div>
+        <div style={{ fontWeight: 600, fontSize: 14, ...leftColStyle }}>{m.description || '(Sin descripción)'}</div>
         {!m.isInstallment && (
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0, marginLeft: 8 }}>
             <button onClick={(e) => { e.stopPropagation(); onEdit(m) }} style={{ background: 'none', border: 'none', color: subtext, cursor: 'pointer' }}><Pencil size={14} /></button>
@@ -31,17 +32,17 @@ export function MovementCard({ m, accounts, onEdit, onDelete, cardBg, border, te
           </div>
         )}
       </div>
-      <div style={{ fontSize: 12, color: subtext, marginTop: 2 }}>
+      <div style={{ fontSize: 12, color: subtext, marginTop: 2, ...leftColStyle }}>
         <b style={{ color: subtext }}>{CATS.find(c => c.id === m.category)?.label || 'Ingreso'}</b> · <span style={{ color: '#f472b6', fontWeight: 600 }}>{accounts.find(a => a.id === m.accountId)?.name || '—'}</span>
       </div>
       {(m.shared || m.isInstallment) && (
-        <div style={{ fontSize: 12, color: accent, marginTop: 2 }}>
+        <div style={{ fontSize: 12, color: accent, marginTop: 2, ...leftColStyle }}>
           {m.isInstallment && `Cuota ${m.cuotaIndex}/${m.plan.count} (Total ${fmt(m.plan.totalAmount)})`}
           {m.isInstallment && m.shared && ' · '}
           {m.shared && 'Compartido'}
         </div>
       )}
-      {m.notes && <div style={{ fontSize: 12, color: subtext, marginTop: 4, fontStyle: 'italic' }}>"{truncateNotes(m.notes)}"</div>}
+      {m.notes && <div style={{ fontSize: 12, color: subtext, marginTop: 4, fontStyle: 'italic', ...leftColStyle }}>"{truncateNotes(m.notes)}"</div>}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginTop: 8 }}>
         <span style={{ fontSize: 12, color: subtext }}>{formatLocalDate(m.date)}</span>
         <span style={{ fontWeight: 700, whiteSpace: 'nowrap', color: m.type === 'income' ? '#22c55e' : '#ef4444' }}>{m.type === 'income' ? '+' : '-'}{fmt(m.amount)}</span>
@@ -83,6 +84,33 @@ export function ConfirmDialog({ dialog, onClose, cardBg, border, text }) {
           <button onClick={() => { dialog.onConfirm(); onClose() }} style={{ flex: 1, padding: 10, borderRadius: 8, border: 'none', background: '#ef4444', color: '#fff', fontWeight: 700, cursor: 'pointer' }}>Confirmar</button>
         </div>
       </div>
+    </div>
+  )
+}
+
+export function AlertsSection({ alerts, onBackupClick, cardBg, border, text, subtext, accent }) {
+  const [open, setOpen] = useState(alerts.length > 0)
+  if (alerts.length === 0) return null
+  const colorFor = (level) => level === 'danger' ? '#ef4444' : '#f97316'
+  return (
+    <div style={{ margin: '0 20px 16px', background: cardBg, border: `1px solid ${border}`, borderRadius: 14, padding: 18 }}>
+      <button onClick={() => setOpen(o => !o)} style={{ width: '100%', background: 'none', border: 'none', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <div style={{ fontSize: 12, letterSpacing: 1, color: subtext, fontWeight: 700 }}>ALERTAS</div>
+          <div style={{ fontSize: 11, fontWeight: 700, color: '#fff', background: '#f97316', borderRadius: 10, padding: '1px 8px' }}>{alerts.length}</div>
+        </div>
+        <SectionChevron open={open} subtext={subtext} />
+      </button>
+      {open && (
+        <div style={{ marginTop: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {alerts.map((a, i) => (
+            <div key={i} onClick={a.onClick} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, padding: '8px 10px', borderRadius: 8, background: colorFor(a.level) + '18', border: `1px solid ${colorFor(a.level)}55`, cursor: a.onClick ? 'pointer' : 'default' }}>
+              <div style={{ width: 6, height: 6, borderRadius: '50%', background: colorFor(a.level), marginTop: 6, flexShrink: 0 }} />
+              <span style={{ fontSize: 13, color: text }}>{a.message}</span>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   )
 }
@@ -155,14 +183,14 @@ export function CuotasSection({ title, emptyText, items, onToggle, onDelete, onA
             return (
               <div key={item.id} style={{ marginBottom: 16, paddingBottom: 14, borderBottom: `1px solid ${border}` }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 4 }}>
-                  <div>
+                  <div style={{ flex: 1, minWidth: 0, paddingRight: 12 }}>
                     <div style={{ fontWeight: 700, fontSize: 14, color: text }}>{item.name} {done && <span style={{ color: '#22c55e', fontSize: 12 }}>· Completado</span>}</div>
                     {renderMeta(item) && <div style={{ fontSize: 12, color: subtext }}>{renderMeta(item)}</div>}
                     <div style={{ fontSize: 12, color: subtext, marginTop: 2 }}>Total {fmt(item.total_amount)} · {paidCount}/{item.cuotas.length} cuotas</div>
                     {item.created_at && <div style={{ fontSize: 11, color: subtext, marginTop: 2 }}>Creado el {formatLocalDate(item.created_at)}</div>}
                     {item.notes && <div style={{ fontSize: 12, color: subtext, fontStyle: 'italic', marginTop: 2 }}>"{truncateNotes(item.notes)}"</div>}
                   </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
                     {done && <button onClick={() => onArchive(item.id)} title="Archivar" style={{ fontSize: 11, fontWeight: 700, color: accent, background: 'none', border: `1px solid ${accent}`, borderRadius: 6, padding: '3px 8px', cursor: 'pointer' }}>Archivar</button>}
                     <button onClick={() => onEdit(item)} style={{ background: 'none', border: 'none', color: subtext, cursor: 'pointer' }}><Pencil size={14} /></button>
                     <button onClick={() => onDelete(item.id)} style={{ background: 'none', border: 'none', color: subtext, cursor: 'pointer' }}><Trash2 size={14} /></button>
@@ -220,14 +248,14 @@ export function InstallmentsOverview({ items, onDelete, onArchive, onEdit, rende
             return (
               <div key={plan.id} style={{ marginBottom: 16, paddingBottom: 14, borderBottom: `1px solid ${border}` }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 4 }}>
-                  <div>
+                  <div style={{ flex: 1, minWidth: 0, paddingRight: 12 }}>
                     <div style={{ fontWeight: 700, fontSize: 14, color: text }}>{plan.name} {plan.shared && <span style={{ color: accent, fontSize: 12, fontWeight: 600 }}>· Compartido</span>}</div>
                     <div style={{ fontSize: 12, color: subtext }}>{renderMeta(plan)}</div>
                     <div style={{ fontSize: 12, color: subtext, marginTop: 2 }}>Total {fmt(plan.totalAmount)} · {paidCount}/{plan.count} cuotas</div>
                     <div style={{ fontSize: 11, color: subtext, marginTop: 2 }}>Comprado el {formatLocalDate(plan.purchaseDate)}</div>
                     {plan.notes && <div style={{ fontSize: 12, color: subtext, fontStyle: 'italic', marginTop: 2 }}>"{truncateNotes(plan.notes)}"</div>}
                   </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
                     {paidCount === plan.count && <button onClick={() => onArchive(plan.id)} title="Archivar" style={{ fontSize: 11, fontWeight: 700, color: accent, background: 'none', border: `1px solid ${accent}`, borderRadius: 6, padding: '3px 8px', cursor: 'pointer' }}>Archivar</button>}
                     <button onClick={() => onEdit(plan)} style={{ background: 'none', border: 'none', color: subtext, cursor: 'pointer' }}><Pencil size={14} /></button>
                     <button onClick={() => onDelete(plan.id)} style={{ background: 'none', border: 'none', color: subtext, cursor: 'pointer' }}><Trash2 size={14} /></button>
