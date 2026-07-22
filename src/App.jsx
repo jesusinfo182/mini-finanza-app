@@ -1,16 +1,18 @@
 import { useState, useEffect, useMemo, useRef } from 'react'
-import { Plus, Moon, Sun, Settings as SettingsIcon, ChevronLeft, ChevronRight, Trash2, Pencil, Wallet } from 'lucide-react'
+import { Plus, Moon, Sun, Settings as SettingsIcon, ChevronLeft, ChevronRight, Trash2, Pencil, Wallet, LogOut } from 'lucide-react'
 import { supabase } from './lib/supabaseClient'
 import * as api from './lib/api'
-import { CATS, fmt, fitFontSize, monthLabel, barColor, cuotaForMonth, monthKey, parseLocalDate, todayLocalISODate, truncateNotes, formatLocalDate } from './lib/helpers'
-import { SummaryCard, ConfirmDialog, ObligationsSection, CuotasSection, InstallmentsOverview, ArchivedSection, MovementCard, AllMovementsView } from './components/Sections'
+import { CATS, fmt, fitFontSize, monthLabel, barColor, cuotaForMonth, cuotaStatus, monthKey, parseLocalDate, todayLocalISODate, truncateNotes, formatLocalDate } from './lib/helpers'
+import { SummaryCard, ConfirmDialog, ObligationsSection, CuotasSection, InstallmentsOverview, ArchivedSection, MovementCard, AllMovementsView, AlertsSection } from './components/Sections'
 import MovementModal from './components/MovementModal'
 import LoanModal from './components/LoanModal'
 import EditInstallmentModal from './components/EditInstallmentModal'
 import SettingsPanel from './components/SettingsPanel'
+import Login from './components/Login'
 
 export default function App() {
   const [loaded, setLoaded] = useState(false)
+  const [session, setSession] = useState(undefined) // undefined = checking, null = logged out, object = logged in
   const [theme, setTheme] = useState('dark')
   const [movements, setMovements] = useState([])
   const [accounts, setAccounts] = useState([])
@@ -37,8 +39,18 @@ export default function App() {
     setConfirmDialog({ message, onConfirm })
   }
 
-  // ---- initial load from Supabase ----
+  // ---- auth session ----
   useEffect(() => {
+    supabase.auth.getSession().then(({ data }) => setSession(data.session))
+    const { data: listener } = supabase.auth.onAuthStateChange((_event, newSession) => {
+      setSession(newSession)
+    })
+    return () => listener.subscription.unsubscribe()
+  }, [])
+
+  // ---- initial load from Supabase (only once logged in) ----
+  useEffect(() => {
+    if (!session) return
     (async () => {
       const data = await api.fetchAllData()
       setAccounts(data.accounts)
@@ -59,7 +71,7 @@ export default function App() {
       }
       setLoaded(true)
     })()
-  }, [])
+  }, [session])
 
   // ---- persist theme/rules changes to settings row ----
   useEffect(() => {
@@ -113,6 +125,50 @@ export default function App() {
     })
     return bal
   }, [movements, accounts, installments])
+
+  const alerts = useMemo(() => {
+    const list = []
+    const today = new Date()
+
+    // Overspent categories (this viewed month)
+    CATS.forEach(c => {
+      const limit = ingresos * (rules[c.id] / 100)
+      const spent = catTotals[c.id]
+      if (limit > 0 && spent > limit) {
+        list.push({ level: 'danger', message: `Te excediste en ${c.label} por ${fmt(spent - limit)}.` })
+      }
+    })
+
+    // Obligations still unmarked, past day 25 of the current real month
+    if (today.getDate() >= 25) {
+      const key = monthKey(today)
+      const checks = obligationChecks[key] || {}
+      obligations.forEach(ob => {
+        if (!checks[ob.id]) list.push({ level: 'warning', message: `"${ob.name}" todavía no está marcada como pagada este mes.` })
+      })
+    }
+
+    // Loan cuotas whose approximate due month has arrived/passed, still unpaid
+    loans.filter(l => !l.archived).forEach(loan => {
+      loan.cuotas.forEach(c => {
+        if (c.paid) return
+        const st = cuotaStatus({ purchaseDate: loan.created_at, count: loan.count }, c.n)
+        if (st !== 'pending') {
+          list.push({ level: 'warning', message: `Cuota ${c.n}/${loan.count} de "${loan.name}" (${loan.kind === 'lend' ? 'me deben' : 'debo'}) podría estar vencida.` })
+        }
+      })
+    })
+
+    // Backup reminder
+    const hasData = movements.length > 0 || installments.length > 0 || loans.length > 0 || obligations.length > 0
+    const referenceDate = lastBackupAt || firstUsedAt
+    const daysSince = referenceDate ? Math.floor((Date.now() - new Date(referenceDate).getTime()) / 86400000) : 0
+    if (hasData && daysSince >= 7) {
+      list.push({ level: 'warning', message: lastBackupAt ? `Hace ${daysSince} días que no hacés backup.` : 'Hace más de una semana que usás la app sin hacer backup.', onClick: downloadBackup })
+    }
+
+    return list
+  }, [catTotals, ingresos, rules, obligations, obligationChecks, loans, movements, installments, lastBackupAt, firstUsedAt])
 
   // ---------------- Actions ----------------
   async function addMovement(mv) {
@@ -330,6 +386,14 @@ export default function App() {
   const subtext = dark ? '#8a8a99' : '#6b6b76'
   const accent = '#7c5cff'
 
+  if (session === undefined) {
+    return <div style={{ minHeight: '100vh', background: bg, color: text, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>Cargando...</div>
+  }
+
+  if (!session) {
+    return <Login theme={theme} />
+  }
+
   if (!loaded) {
     return <div style={{ minHeight: '100vh', background: bg, color: text, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>Cargando...</div>
   }
@@ -345,21 +409,11 @@ export default function App() {
         <div style={{ display: 'flex', gap: 8 }}>
           <button onClick={() => setTheme(dark ? 'light' : 'dark')} style={iconBtn}>{dark ? <Sun size={18} /> : <Moon size={18} />}</button>
           <button onClick={() => setShowSettings(true)} style={iconBtn}><SettingsIcon size={18} /></button>
+          <button onClick={() => supabase.auth.signOut()} style={iconBtn} title="Cerrar sesión"><LogOut size={18} /></button>
         </div>
       </div>
 
-      {(() => {
-        const hasData = movements.length > 0 || installments.length > 0 || loans.length > 0 || obligations.length > 0
-        const referenceDate = lastBackupAt || firstUsedAt
-        const daysSince = referenceDate ? Math.floor((Date.now() - new Date(referenceDate).getTime()) / 86400000) : 0
-        if (!hasData || daysSince < 7) return null
-        return (
-          <div style={{ margin: '0 20px', background: '#f9731622', border: '1px solid #f9731655', borderRadius: 12, padding: '10px 14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
-            <span style={{ fontSize: 12, color: text }}>{lastBackupAt ? `Hace ${daysSince} días que no hacés backup.` : 'Hace más de una semana que usás la app sin hacer backup.'}</span>
-            <button onClick={downloadBackup} style={{ fontSize: 12, fontWeight: 700, color: '#f97316', background: 'none', border: 'none', cursor: 'pointer', whiteSpace: 'nowrap' }}>Descargar ahora</button>
-          </div>
-        )
-      })()}
+      <AlertsSection alerts={alerts} onBackupClick={downloadBackup} cardBg={cardBg} border={border} text={text} subtext={subtext} accent={accent} />
 
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 16, padding: '12px 0' }}>
         <button onClick={() => setMonthCursor(d => new Date(d.getFullYear(), d.getMonth() - 1, 1))} style={iconBtn}><ChevronLeft size={16} /></button>
@@ -375,7 +429,7 @@ export default function App() {
             <>
               <SummaryCard label="Ingresos" value={vals[0]} fontSize={sharedSize} color={text} cardBg={cardBg} border={border} subtext={subtext} />
               <SummaryCard label="Gastado" value={vals[1]} fontSize={sharedSize} color="#ef4444" cardBg={cardBg} border={border} subtext={subtext} />
-              <SummaryCard label="Disponible" value={vals[2]} fontSize={sharedSize} color="#22c55e" cardBg={cardBg} border={border} subtext={subtext} />
+              <SummaryCard label="Disponible" value={vals[2]} fontSize={sharedSize} color={disponible >= 0 ? '#22c55e' : '#ef4444'} cardBg={cardBg} border={border} subtext={subtext} />
             </>
           )
         })()}
@@ -386,13 +440,17 @@ export default function App() {
         {CATS.map(c => {
           const limit = ingresos * (rules[c.id] / 100)
           const spent = catTotals[c.id]
-          const pct = limit > 0 ? Math.min(100, (spent / limit) * 100) : 0
+          const realPct = limit > 0 ? (spent / limit) * 100 : 0
+          const pct = Math.min(100, realPct)
           return (
             <div key={c.id} style={{ marginBottom: 14 }}>
               <div style={{ fontSize: 14, whiteSpace: 'nowrap', marginBottom: 2 }}>{c.label} ({rules[c.id]}%)</div>
-              <div style={{ color: subtext, fontSize: 13, whiteSpace: 'nowrap', marginBottom: 6 }}>{fmt(spent)} / {fmt(limit)}</div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 6 }}>
+                <span style={{ color: subtext, fontSize: 13, whiteSpace: 'nowrap' }}>{fmt(spent)} / {fmt(limit)}</span>
+                {limit > 0 && <span style={{ color: barColor(realPct), fontSize: 13, fontWeight: 700, whiteSpace: 'nowrap' }}>{Math.round(realPct)}%</span>}
+              </div>
               <div style={{ height: 8, borderRadius: 4, background: border, overflow: 'hidden' }}>
-                <div style={{ height: '100%', width: `${pct}%`, background: barColor(pct), transition: 'width .3s' }} />
+                <div style={{ height: '100%', width: `${pct}%`, background: barColor(realPct), transition: 'width .3s' }} />
               </div>
             </div>
           )
