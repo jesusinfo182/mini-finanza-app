@@ -12,6 +12,7 @@ import Login from './components/Login'
 
 export default function App() {
   const [loaded, setLoaded] = useState(false)
+  const [loadError, setLoadError] = useState(null)
   const [session, setSession] = useState(undefined) // undefined = checking, null = logged out, object = logged in
   const [theme, setTheme] = useState('dark')
   const [movements, setMovements] = useState([])
@@ -49,9 +50,9 @@ export default function App() {
   }, [])
 
   // ---- initial load from Supabase (only once logged in) ----
-  useEffect(() => {
-    if (!session) return
-    (async () => {
+  async function loadData() {
+    setLoadError(null)
+    try {
       const data = await api.fetchAllData()
       setAccounts(data.accounts)
       setMovements(data.movements)
@@ -70,7 +71,14 @@ export default function App() {
         setLastBackupAt(data.settings.last_backup_at)
       }
       setLoaded(true)
-    })()
+    } catch (err) {
+      setLoadError('No pudimos conectar con el servidor. Revisá tu conexión a internet.')
+    }
+  }
+
+  useEffect(() => {
+    if (!session) return
+    loadData()
   }, [session])
 
   // ---- persist theme changes to settings row (safe to auto-save, always intentional) ----
@@ -403,6 +411,17 @@ export default function App() {
   }
 
   if (!loaded) {
+    if (loadError) {
+      return (
+        <div style={{ minHeight: '100vh', background: bg, color: text, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 24, textAlign: 'center' }}>
+          <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 8 }}>No pudimos conectar</div>
+          <div style={{ fontSize: 13, color: subtext, marginBottom: 20, maxWidth: 280 }}>{loadError}</div>
+          <button onClick={loadData} style={{ padding: '10px 20px', borderRadius: 10, border: 'none', background: accent, color: '#fff', fontWeight: 700, cursor: 'pointer' }}>
+            Reintentar
+          </button>
+        </div>
+      )
+    }
     return <Skeleton bg={bg} cardBg={cardBg} border={border} />
   }
 
