@@ -116,7 +116,7 @@ export function ConfirmDialog({ dialog, onClose, cardBg, border, text }) {
 }
 
 export function AlertsSection({ alerts, onBackupClick, cardBg, border, text, subtext, accent }) {
-  const [open, setOpen] = useState(alerts.length > 0)
+  const [open, setOpen] = useState(false)
   if (alerts.length === 0) return null
   const colorFor = (level) => level === 'danger' ? '#ef4444' : '#f97316'
   return (
