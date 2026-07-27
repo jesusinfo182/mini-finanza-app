@@ -10,6 +10,33 @@ function SectionChevron({ open, subtext }) {
   )
 }
 
+export function Skeleton({ bg, cardBg, border }) {
+  const shimmer = { background: `linear-gradient(90deg, ${cardBg} 25%, ${border} 50%, ${cardBg} 75%)`, backgroundSize: '200% 100%', animation: 'skeleton-pulse 1.4s ease-in-out infinite', borderRadius: 10 }
+  return (
+    <div style={{ minHeight: '100vh', background: bg, padding: '20px' }}>
+      <style>{`@keyframes skeleton-pulse { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }`}</style>
+      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 20 }}>
+        <div style={{ ...shimmer, width: 90, height: 26 }} />
+        <div style={{ display: 'flex', gap: 8 }}>
+          <div style={{ ...shimmer, width: 36, height: 36, borderRadius: 10 }} />
+          <div style={{ ...shimmer, width: 36, height: 36, borderRadius: 10 }} />
+        </div>
+      </div>
+      <div style={{ ...shimmer, width: 160, height: 22, margin: '0 auto 18px' }} />
+      <div style={{ display: 'flex', gap: 10, marginBottom: 16 }}>
+        <div style={{ ...shimmer, flex: 1, height: 66, borderRadius: 12 }} />
+        <div style={{ ...shimmer, flex: 1, height: 66, borderRadius: 12 }} />
+        <div style={{ ...shimmer, flex: 1, height: 66, borderRadius: 12 }} />
+      </div>
+      <div style={{ ...shimmer, height: 150, borderRadius: 14, marginBottom: 14 }} />
+      <div style={{ ...shimmer, height: 90, borderRadius: 14, marginBottom: 14 }} />
+      <div style={{ ...shimmer, height: 60, borderRadius: 12, marginBottom: 8 }} />
+      <div style={{ ...shimmer, height: 60, borderRadius: 12, marginBottom: 8 }} />
+      <div style={{ ...shimmer, height: 60, borderRadius: 12 }} />
+    </div>
+  )
+}
+
 export function SummaryCard({ label, value, fontSize, color, cardBg, border, subtext }) {
   return (
     <div style={{ flex: 1, minWidth: 0, background: cardBg, border: `1px solid ${border}`, borderRadius: 12, padding: '14px 8px', textAlign: 'center' }}>
