@@ -3,7 +3,7 @@ import { Plus, Moon, Sun, Settings as SettingsIcon, ChevronLeft, ChevronRight, T
 import { supabase } from './lib/supabaseClient'
 import * as api from './lib/api'
 import { CATS, fmt, fitFontSize, monthLabel, barColor, cuotaForMonth, cuotaStatus, monthKey, parseLocalDate, todayLocalISODate, truncateNotes, formatLocalDate } from './lib/helpers'
-import { SummaryCard, ConfirmDialog, ObligationsSection, CuotasSection, InstallmentsOverview, ArchivedSection, MovementCard, AllMovementsView, AlertsSection } from './components/Sections'
+import { SummaryCard, ConfirmDialog, ObligationsSection, CuotasSection, InstallmentsOverview, ArchivedSection, MovementCard, AllMovementsView, AlertsSection, Skeleton } from './components/Sections'
 import MovementModal from './components/MovementModal'
 import LoanModal from './components/LoanModal'
 import EditInstallmentModal from './components/EditInstallmentModal'
@@ -73,11 +73,19 @@ export default function App() {
     })()
   }, [session])
 
-  // ---- persist theme/rules changes to settings row ----
+  // ---- persist theme changes to settings row (safe to auto-save, always intentional) ----
   useEffect(() => {
     if (!loaded) return
-    api.updateSettings({ theme, rules })
-  }, [theme, rules, loaded])
+    api.updateSettings({ theme })
+  }, [theme, loaded])
+
+  // Rules are saved ONLY when the user explicitly confirms them in Settings (see saveRules below),
+  // never automatically — this avoids a race condition where a slow initial load could silently
+  // overwrite a saved custom rule with the default 50/30/20 before the real data arrives.
+  function saveRules(newRules) {
+    setRules(newRules)
+    api.updateSettings({ rules: newRules })
+  }
 
   const monthMovements = useMemo(() => {
     return movements.filter(m => {
@@ -298,7 +306,7 @@ export default function App() {
           const data = JSON.parse(e.target.result)
           if (data.movements) setMovements(data.movements)
           if (data.accounts) setAccounts(data.accounts)
-          if (data.rules) setRules(data.rules)
+          if (data.rules) saveRules(data.rules)
           if (data.obligations) setObligations(data.obligations)
           if (data.obligationChecks) setObligationChecks(data.obligationChecks)
           if (data.installments) setInstallments(data.installments)
@@ -387,7 +395,7 @@ export default function App() {
   const accent = '#7c5cff'
 
   if (session === undefined) {
-    return <div style={{ minHeight: '100vh', background: bg, color: text, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>Cargando...</div>
+    return <Skeleton bg={bg} cardBg={cardBg} border={border} />
   }
 
   if (!session) {
@@ -395,7 +403,7 @@ export default function App() {
   }
 
   if (!loaded) {
-    return <div style={{ minHeight: '100vh', background: bg, color: text, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>Cargando...</div>
+    return <Skeleton bg={bg} cardBg={cardBg} border={border} />
   }
 
   const iconBtn = { width: 36, height: 36, borderRadius: 10, background: cardBg, border: `1px solid ${border}`, color: text, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }
@@ -560,7 +568,7 @@ export default function App() {
 
       {showSettings && (
         <SettingsPanel
-          rules={rules} setRules={setRules}
+          rules={rules} setRules={saveRules}
           accounts={accounts} addAccount={addAccount} deleteAccount={deleteAccount}
           obligations={obligations} addObligation={addObligation} deleteObligation={deleteObligation}
           onClose={() => setShowSettings(false)}
